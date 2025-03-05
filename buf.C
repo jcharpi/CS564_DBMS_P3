@@ -70,33 +70,113 @@ BufMgr::~BufMgr()
 const Status BufMgr::allocBuf(int &frame)
 {
   // storing initial hand position to compare with hand position at later times
-  unsigned int clockHandStart = clockHand;
+  int frameCount = 0;
 
-  // keeping track of how many times we've gone around the clock
-  int loops = 0;
-
-  // checking that hash table is populated (i.e. there are frames to check through)
-  while (numBufs != 0) {
+  // Looping through clock, firstly considering all cases where !refbit.
+  // Second pass ensures that frames with refbit cleared in the first pass are then checked too.
+  while (frameCount < 2 * numBufs)
+  {
     // Frame state details for frame at current clockHand
-    BufDesc *bufDesc = &bufTable[clockHand];
+    BufDesc *frameState = &bufTable[clockHand];
+
     // 1. if frame is invalid, set() on frame
-    if(!bufDesc -> frameNo) {
-      
+    if (!frameState->valid)
+    {
+      frame = clockHand;
+      advanceClock();
+      return OK;
     }
+
     // 2. if valid AND if refbit, clear refbit, advance clock
+    if (frameState->refbit)
+    {
+      frameState->refbit = false;
+      frameCount++;
+      advanceClock();
+      continue;
+    }
+
     // 3. if valid AND !refbit AND check pinCnt > 0, advance clock
+    if (frameState->pinCnt > 0)
+    {
+      frameCount++;
+      advanceClock();
+      continue;
+    }
+
     // 4. if valid AND !refbit AND pinCnt == 0 AND dirty, flush page to disk => clear old frame from Hashtable, set() on frame
+    if (frameState->dirty)
+    {
+      // Status of flushing page to disc
+      Status stat = frameState->file->writePage(frameState->pageNo, &bufPool[clockHand]);
+      if (stat != OK)
+        return UNIXERR; // Couldn't flush page to disc
+      frameState->dirty = false;
+    }
+
     // 5. if valid AND !refbit AND pinCnt == 0 AND !dirty, clear old frame from Hashtable, set() on frame
+    hashTable->remove(frameState->file, frameState->pageNo); // remove file from hashtable
+    frameState->Clear();                                     // clear frame for new page
+
+    // update frame to position of clock hand (frame free for use)
+    frame = clockHand;
+    advanceClock();
+    return OK;
   }
+
+  // If we've gone through and checked every frame, even those that were originally had refBit set
+  // and we still haven't found a frame, they must all be pinned
+  return BUFFEREXCEEDED;
 }
 
 const Status BufMgr::readPage(File *file, const int PageNo, Page *&page)
 {
+  int frameNo; // updated on lookup() call
+  Status stat;
+
+  // 1. Lookup page in hash table
+  stat = hashTable->lookup(file, PageNo, frameNo);
+  
+  // Page not in bufferPool
+  if (stat == HASHNOTFOUND) {
+    int frame;
+
+    // Allocate frame
+    stat = allocBuf(frame);
+    if (stat != OK) return stat;
+
+    // Read page from disk
+  }
 }
 
 const Status BufMgr::unPinPage(File *file, const int PageNo,
                                const bool dirty)
 {
+  int frameNo; // updated on lookup() call
+  Status stat;
+
+  // 1. Lookup page in hash table
+  stat = hashTable->lookup(file, PageNo, frameNo);
+
+  // 2. If page not in bufferPool, return HASHNOTFOUND
+  if (stat != OK)
+    return HASHNOTFOUND;
+
+  // Now we know we have valid frame (2), therefore we can get frameState
+  BufDesc *frameState = &bufTable[frameNo];
+
+  // 3. If frame not pinned anywhere, return PAGENOTPINNED
+  if (frameState->pinCnt == 0)
+    return PAGENOTPINNED;
+
+  // 4. Decrement pinCnt
+  frameState->pinCnt--;
+
+  // 5. Set dirty bit if dirty param == true
+  if (dirty)
+    frameState->dirty = true;
+
+  return OK;
 }
 
 const Status BufMgr::allocPage(File *file, int &pageNo, Page *&page)
