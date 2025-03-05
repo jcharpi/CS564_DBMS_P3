@@ -136,17 +136,58 @@ const Status BufMgr::readPage(File *file, const int PageNo, Page *&page)
 
   // 1. Lookup page in hash table
   stat = hashTable->lookup(file, PageNo, frameNo);
-  
-  // Page not in bufferPool
-  if (stat == HASHNOTFOUND) {
+
+  // Set() will leave the pinCnt for the page set to 1
+  // Return a pointer to the frame containing the page via the page parameter.
+
+  // 2. Page not in bufferPool
+  if (stat == HASHNOTFOUND)
+  {
     int frame;
 
-    // Allocate frame
+    // 3. Call allocBuf() to allocate a buffer frame
     stat = allocBuf(frame);
-    if (stat != OK) return stat;
+    if (stat != OK)
+      return stat;
 
-    // Read page from disk
+    // 4. Call the method file->readPage() to read the page from disk into the buffer pool frame
+    stat = file->readPage(PageNo, &bufPool[frame]);
+
+    // 5. Insert the page into the hashtable
+    stat = hashTable->insert(file, PageNo, frame);
+    if (stat != OK)
+    {
+      bufTable[frame].Clear();
+      return HASHTBLERROR;
+    }
+
+    // 6. Invoke Set() on the frame to set it up properly
+    bufTable[frame].Set(file, PageNo);
+    page = &bufPool[frame];
+
+    return OK;
   }
+  // 7. Page in bufferPool
+  else if (stat == OK)
+  {
+    BufDesc *frameState = &bufTable[frameNo];
+    // 8. Set the appropriate refbit
+    frameState->refbit = true;
+
+    // 9. Increment the pinCnt for the page
+    frameState->pinCnt++;
+
+    // 10. Return a pointer to the frame containing the page via the page parameter
+    page = &bufPool[frameNo];
+
+    // 11. Returns OK if no errors occurred
+    return OK;
+  }
+
+  return stat;
+  // 12. UNIXERR if a Unix error occurred
+  // 13. BUFFEREXCEEDED if all buffer frames are pinned
+  // 14. HASHTBLERROR if a hash table error occurred
 }
 
 const Status BufMgr::unPinPage(File *file, const int PageNo,
