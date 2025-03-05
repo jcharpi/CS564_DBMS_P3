@@ -69,6 +69,25 @@ BufMgr::~BufMgr()
 
 const Status BufMgr::allocBuf(int &frame)
 {
+  // storing initial hand position to compare with hand position at later times
+  unsigned int clockHandStart = clockHand;
+
+  // keeping track of how many times we've gone around the clock
+  int loops = 0;
+
+  // checking that hash table is populated (i.e. there are frames to check through)
+  while (numBufs != 0) {
+    // Frame state details for frame at current clockHand
+    BufDesc *bufDesc = &bufTable[clockHand];
+    // 1. if frame is invalid, set() on frame
+    if(!bufDesc -> frameNo) {
+      
+    }
+    // 2. if valid AND if refbit, clear refbit, advance clock
+    // 3. if valid AND !refbit AND check pinCnt > 0, advance clock
+    // 4. if valid AND !refbit AND pinCnt == 0 AND dirty, flush page to disk => clear old frame from Hashtable, set() on frame
+    // 5. if valid AND !refbit AND pinCnt == 0 AND !dirty, clear old frame from Hashtable, set() on frame
+  }
 }
 
 const Status BufMgr::readPage(File *file, const int PageNo, Page *&page)
