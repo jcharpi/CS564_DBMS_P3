@@ -152,6 +152,11 @@ const Status BufMgr::readPage(File *file, const int PageNo, Page *&page)
 
     // 4. Call the method file->readPage() to read the page from disk into the buffer pool frame
     stat = file->readPage(PageNo, &bufPool[frame]);
+    if (stat != OK)
+    {
+      bufTable[frame].Clear(); // Clear the invalid frame
+      return stat;
+    }
 
     // 5. Insert the page into the hashtable
     stat = hashTable->insert(file, PageNo, frame);
