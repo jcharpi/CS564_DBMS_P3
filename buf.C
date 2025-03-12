@@ -227,6 +227,33 @@ const Status BufMgr::unPinPage(File *file, const int PageNo,
 
 const Status BufMgr::allocPage(File *file, int &pageNo, Page *&page)
 {
+ int frameNo;
+  Status stat;
+  
+  // allocate the page
+  stat = file->allocatePage(pageNo);
+  if(stat != OK){
+    return stat;
+  }
+
+  // allocate a buffer frame for the page
+  stat = allocBuf(frameNo);
+  if(stat != OK){
+    return stat;
+  }
+
+  // mape the frame to the hashtable
+  stat = hashTable->insert(file, pageNo, frameNo);
+  if(stat != OK){
+    return stat;
+  }
+
+  // set page from disc into buf frame
+  bufTable[frameNo].Set(file, pageNo);
+  bufTable[frameNo].frameNo = frameNo;
+  page = &bufPool[frameNo];
+
+  return OK;
 }
 
 const Status BufMgr::disposePage(File *file, const int pageNo)
