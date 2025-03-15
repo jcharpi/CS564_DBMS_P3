@@ -258,10 +258,10 @@ int main()
     ASSERT(memcmp(page, &cmp, strlen((char *)&cmp)) == 0);
     cout << (char *)page << endl;
   }
-
+  
   cout << "Test passed" << endl
        << endl;
-
+  
   cout << "flushing file with pages still pinned. Should generate an error" << endl;
   FAIL(status = bufMgr->flushFile(file1));
   error.print(status);
