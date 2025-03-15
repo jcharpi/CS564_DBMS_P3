@@ -49,6 +49,8 @@ int main()
   int i;
   const int num = 100;
   int j[num];
+  int tmpPages[num];       // For additional tests
+  Page* tmpPagePtrs[num];  // For additional tests
 
   // create buffer manager
 
@@ -262,6 +264,39 @@ int main()
   cout << "Test passed" << endl
        << endl;
   
+  // Original Tests above
+  
+  // Additional Test 1: Test allocBuf with pinned pages
+  // Trying to allocate buffer with pinned pages should return an error
+  // After unpinning, the allocate should succeed
+  /*cout << "\nTesting pinned page replacement..." << endl;
+  int pinnedPageNo = j[0]; 
+  Page* pinnedPage;        
+  Status s;                
+
+  CALL(bufMgr->readPage(file1, pinnedPageNo, pinnedPage)); // pinCnt=1
+  
+  // Attempt to fill buffer (allocPage calls allocBuf internally)
+  s = OK;
+  for(i = 0; i < num; i++) {
+    s = bufMgr->allocPage(file4, tmpPages[i], tmpPagePtrs[i]);
+    if(s != OK) break;
+  }
+  ASSERT(s == BUFFEREXCEEDED); // Should fail due to pinned page
+  
+  // Cleanup pinned page and retry allocation
+  CALL(bufMgr->unPinPage(file1, pinnedPageNo, false));
+  CALL(bufMgr->allocPage(file4, tmpPages[0], tmpPagePtrs[0])); // Should succeed
+  
+  // Cleanup allocated pages
+  for(i = 0; i < num; i++) {
+    CALL(bufMgr->unPinPage(file4, tmpPages[i], false));
+  }
+  cout << "Test passed" << endl 
+       << endl;
+  
+  */
+  // Original Tests continue below
   cout << "flushing file with pages still pinned. Should generate an error" << endl;
   FAIL(status = bufMgr->flushFile(file1));
   error.print(status);
